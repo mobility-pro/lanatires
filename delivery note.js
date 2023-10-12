@@ -23,8 +23,54 @@ frappe.ui.form.on("Delivery Note", {
 				}
 			};
 		});
+	},
+    update_additional_discount: function(frm) {
+        frm.doc.discount_amount = 0;
+        frm.doc.apply_discount_on = 'Net Total';
+        
+        $.each(frm.doc.items || [], function(i, row) {
+            if (row.discount_percentage_custom) {
+    	        row.discount_amount_custom = 0;
+    	        row.discount_rate = (row.rate * row.discount_percentage_custom) / 100;
+    	        row.discount_amount_custom = (row.discount_rate * row.qty);
+            }
+    	    
+    	    if (row.discount_rate && !row.discount_percentage_custom) {
+    	        row.discount_amount_custom = row.discount_rate * row.qty;
+    	    }
+    	    
+            frm.doc.discount_amount += row.discount_amount_custom;
+            if (frm.doc.discount_amount) {
+                frm.doc.cost_center = row.cost_center;
+            }
+        });
+        
+        frm.refresh_fields();
+    },
+    
+    additional_discount_percentage: function(frm) {
+        $.each(frm.doc.items || [], function(i, row) {
+            row.discount_amount_custom = (row.amount * frm.doc.additional_discount_percentage) / 100;
+        });
+        frm.refresh_fields('items');
+    },
+    
+    discount_amount: function(frm) {
+        $.each(frm.doc.items || [], function(i, row) {
+            row.discount_amount_custom = (row.amount * frm.doc.discount_amount) / frm.doc.net_total;
+        });
+        frm.refresh_fields('items');
+    },
+	before_save: function(frm){
+			frappe.db.get_doc("Customer Group", frm.doc.customer_group)
+				.then((doc) => {
+					frm.set_value({
+						"branch": doc.branch
+					});
+				});
 	}
 });
+
 
 frappe.ui.form.on('Delivery Note Item', {
 	production_year: function(frm, cdt, cdn) {
@@ -71,62 +117,7 @@ frappe.ui.form.on('Delivery Note Item', {
 	    frm.events.update_additional_discount(frm);
 	},
 	
-	qty: function(frm) {
-	    frm.events.update_additional_discount(frm);
-	},
-	
-	rate: function(frm) {
-	    frm.events.update_additional_discount(frm);
-	}
+	qty: frm.events.update_additional_discount(frm),
+	rate: frm.events.update_additional_discount(frm)
 });
 
-frappe.ui.form.on("Delivery Note", {
-    update_additional_discount: function(frm) {
-        frm.doc.discount_amount = 0;
-        frm.doc.apply_discount_on = 'Net Total';
-        
-        $.each(frm.doc.items || [], function(i, row) {
-            if (row.discount_percentage_custom) {
-    	        row.discount_amount_custom = 0;
-    	        row.discount_rate = (row.rate * row.discount_percentage_custom) / 100;
-    	        row.discount_amount_custom = (row.discount_rate * row.qty);
-            }
-    	    
-    	    if (row.discount_rate && !row.discount_percentage_custom) {
-    	        row.discount_amount_custom = row.discount_rate * row.qty;
-    	    }
-    	    
-            frm.doc.discount_amount += row.discount_amount_custom;
-            if (frm.doc.discount_amount) {
-                frm.doc.cost_center = row.cost_center;
-            }
-        });
-        
-        frm.refresh_fields();
-    },
-    
-    additional_discount_percentage: function(frm) {
-        $.each(frm.doc.items || [], function(i, row) {
-            row.discount_amount_custom = (row.amount * frm.doc.additional_discount_percentage) / 100;
-        });
-        frm.refresh_fields('items');
-    },
-    
-    discount_amount: function(frm) {
-        $.each(frm.doc.items || [], function(i, row) {
-            row.discount_amount_custom = (row.amount * frm.doc.discount_amount) / frm.doc.net_total;
-        });
-        frm.refresh_fields('items');
-    }
-});
-
-frappe.ui.form.on('Delivery Note', {
-	before_save: function(frm){
-			frappe.db.get_doc("Customer Group", frm.doc.customer_group)
-				.then((doc) => {
-					frm.set_value({
-						"branch": doc.branch
-					});
-				});
-	}
-});
